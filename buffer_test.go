@@ -183,7 +183,6 @@ func TestAsyncBuffer(t *testing.T) {
 
 			select {
 			case err := <-errch:
-				t.Log(err)
 				if se := new(ErrFlush[string]); errors.As(err, se) {
 					if !tt.skipCompareWant && !reflect.DeepEqual(se.Backup, tt.wantErrBackup) {
 						t.Errorf("Returns err backup error, actual: %v, want: %v", se.Backup, tt.wantErrBackup)

@@ -128,9 +128,11 @@ func (b *Buffer[T]) flush(flat []T) {
 		return
 	}
 	if err := b.flusher.Flush(flat...); err != nil {
+		se := NewErrFlush(err, flat)
 		go func() {
-			b.errch <- NewErrFlush(err, flat)
+			b.errch <- se
 		}()
+		fmt.Println(se)
 	}
 }
 
@@ -149,7 +151,9 @@ func (b *Buffer[T]) Close() error {
 	}
 
 	if err := b.flusher.Flush(flat...); err != nil {
-		return NewErrFlush(err, flat)
+		se := NewErrFlush(err, flat)
+		fmt.Println(se)
+		return se
 	}
 
 	return nil
