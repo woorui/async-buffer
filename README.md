@@ -5,7 +5,7 @@
 
 The async-buffer buffer data that can be flushed when reach threshold or duration limit. It is multi-goroutinue safe.
 
-**Important! It Only support go1.18 or later**
+**It only support go1.18 or later**
 
 ## Why you need it?
 
@@ -46,20 +46,32 @@ func (p *printer) Flush(strs ...string) error {
 }
 
 func main() {
-	buf, errch := buffer.New[string](100, 5*time.Second, &printer{})
+	buf, errch := buffer.New[string](6, 3*time.Second, &printer{})
 
 	// If you don't care about the refresh error
 	// and the refresh error elements, you can ignore them.
 	go errHandle(errch)
 
+	// 1. flush at threshold
+	buf.Write("a", "b", "c", "d", "e", "f")
+	// Output
+	// printer flush elements: [a b c d e f], flush size: 6
+
+	// 2. time to flush automatically
 	buf.Write("aaaaa")
 	buf.Write("bbbbb")
 	buf.Write("ccccc", "ddddd")
-
-	// Output after 5 second.
+	time.Sleep(5 * time.Second)
+	// Output
 	// printer flush elements: [aaaaa bbbbb ccccc ddddd], flush size: 4
-    // 
 
+	// 3. flush manually
+	buf.Write("eeeee", "fffff")
+	buf.Flush()
+	// Output
+	// printer flush elements: [eeeee fffff], flush size: 2
+
+	// waiting...
 	select {}
 }
 
@@ -74,6 +86,7 @@ func errHandle(errch <-chan error) {
 		}
 	}
 }
+
 ```
 
 ## License
