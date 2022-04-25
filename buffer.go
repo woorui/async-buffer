@@ -158,16 +158,16 @@ func (b *Buffer[T]) Close() error {
 // ErrFlush is returned form `Write` when automatic flushing error,
 type ErrFlush[T any] struct {
 	underlying error
-	backup     []T
+	Backup     []T
 }
 
 // NewErrFlush return ErrFlush, error is flush error, elements is elements that not be handled.
 func NewErrFlush[T any](err error, elements []T) error {
-	return ErrFlush[T]{underlying: err, backup: elements}
+	return ErrFlush[T]{underlying: err, Backup: elements}
 }
 
 func (e ErrFlush[T]) Error() string {
-	return fmt.Sprintf("async-buffer: error while flushing error = %v, backup size = %d", e.underlying, len(e.backup))
+	return fmt.Sprintf("async-buffer: error while flushing error = %v, backup size = %d", e.underlying, len(e.Backup))
 }
 
 func wrapNewTicker(d time.Duration) (<-chan time.Time, func()) {
