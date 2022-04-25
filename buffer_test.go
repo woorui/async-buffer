@@ -195,6 +195,17 @@ func TestAsyncBuffer(t *testing.T) {
 	}
 }
 
+func TestPanicNew(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+	}()
+	co := newStringCounter("", time.Microsecond)
+
+	New[string](0, 0, co)
+}
+
 // stringInclude return if arr includes v
 func stringInclude(arr []string, v string) bool {
 	b := false

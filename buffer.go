@@ -49,6 +49,9 @@ type Buffer[T any] struct {
 // You can subscribe to this channel if you want handle flush errors.
 // using `errors.As(err, ErrFlush)` to get elements that not be flushed.
 func New[T any](threshold uint32, flushInterval time.Duration, flusher Flusher[T]) (*Buffer[T], <-chan error) {
+	if threshold == 0 && flushInterval == 0 {
+		panic(fmt.Errorf("One of threshold and flushInterval must not be 0"))
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 
 	var (
