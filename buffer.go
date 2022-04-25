@@ -106,6 +106,9 @@ func (b *Buffer[T]) run() {
 			return
 		case d := <-b.datas:
 			flat = append(flat, d)
+			if b.threshold == 0 {
+				continue
+			}
 			if len(flat) == cap(flat) {
 				b.flush(flat)
 				flat = flat[:0]

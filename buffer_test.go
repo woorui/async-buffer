@@ -43,7 +43,7 @@ func TestAsyncBuffer(t *testing.T) {
 			args: args{
 				errInput:       "",
 				dataGroup:      [][]string{{"AA", "BB"}, {"AA"}, {"DD"}, {"EEEEE"}},
-				flushThreshold: 16,
+				flushThreshold: 0,
 				mockFlushCost:  time.Microsecond,
 				flushInterval:  time.Second,
 				waitDuration:   2 * time.Second,
