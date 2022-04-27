@@ -76,13 +76,11 @@ func main() {
 }
 
 func errHandle(errch <-chan error) {
-	for {
-		select {
-		case err := <-errch:
+	for err := range errch {
+		if se := new(buffer.ErrFlush[string]); errors.As(err, se) {
+			fmt.Printf("flush err backup %v \n", se.Backup)
+		} else {
 			fmt.Printf("flush err %v \n", err)
-			if se := new(buffer.ErrFlush[string]); errors.As(err, se) {
-				fmt.Printf("flush err backup %v \n", se.Backup)
-			}
 		}
 	}
 }
