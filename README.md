@@ -47,6 +47,7 @@ func (p *printer) Flush(strs ...string) error {
 
 func main() {
 	buf, errch := buffer.New[string](6, 3*time.Second, &printer{})
+	defer buf.Close()
 
 	// If you don't care about the refresh error
 	// and the refresh error elements, you can ignore them.
