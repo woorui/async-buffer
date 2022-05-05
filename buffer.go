@@ -20,6 +20,15 @@ type Flusher[T any] interface {
 	Flush(elements ...T) error
 }
 
+// The FlushFunc is an adapter to allow the use of ordinary functions
+// as a Flusher. FlushFunc(f) is a Flusher that calls f.
+type FlushFunc[T any] func(elements ...T) error
+
+// Flush calls f(ctx,m)
+func (f FlushFunc[T]) Flush(elements ...T) error {
+	return f(elements...)
+}
+
 // Buffer represents an async buffer
 //
 // The Buffer automatically flush data within a cycle

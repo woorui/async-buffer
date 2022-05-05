@@ -61,7 +61,8 @@ func TestAsyncBuffer(t *testing.T) {
 				waitDuration:   2 * time.Second,
 				manual:         true,
 			},
-			want: map[string]int{"EEEEE": 1},
+			skipCompareWant: true,
+			want:            map[string]int{"EEEEE": 1},
 		},
 		{
 			name: "close immediately",
@@ -204,6 +205,18 @@ func TestPanicNew(t *testing.T) {
 	co := newStringCounter("", time.Microsecond)
 
 	New[string](0, 0, co)
+}
+
+func TestFlushFunc(t *testing.T) {
+	co := newStringCounter("", time.Microsecond)
+
+	flushfunc := co.Flush
+
+	buf, _ := New[string](1, 2, FlushFunc[string](flushfunc))
+
+	defer buf.Close()
+
+	buf.Write("asd")
 }
 
 // stringInclude return if arr includes v

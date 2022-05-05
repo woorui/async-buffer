@@ -27,6 +27,8 @@ go get -u github.com/woorui/async-buffer
 
 ## Quick start
 
+The `Write`, `Flush`, `Close` api are goroutinue-safed.
+
 ```go
 package main
 
@@ -41,12 +43,19 @@ import (
 type printer struct{}
 
 func (p *printer) Flush(strs ...string) error {
+	return print(strs...)
+}
+
+func print(strs ...string) error {
 	fmt.Printf("printer flush elements: %v, flush size: %d \n", strs, len(strs))
 	return nil
 }
 
 func main() {
 	buf, errch := buffer.New[string](6, 3*time.Second, &printer{})
+	// can also call buffer.FlushFunc to adapt the Flusher, 
+	// code as below:
+	// buf, errch := buffer.New[string](6, 3*time.Second, buffer.FlushFunc[string](print))
 	defer buf.Close()
 
 	// If you don't care about the refresh error
