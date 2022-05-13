@@ -17,16 +17,16 @@ var (
 
 // Flusher hold FlushFunc, Flusher tell Buffer how to flush data.
 type Flusher[T any] interface {
-	Flush(elements ...T) error
+	Flush(elements []T) error
 }
 
 // The FlushFunc is an adapter to allow the use of ordinary functions
 // as a Flusher. FlushFunc(f) is a Flusher that calls f.
-type FlushFunc[T any] func(elements ...T) error
+type FlushFunc[T any] func(elements []T) error
 
 // Flush calls f(ctx,m)
-func (f FlushFunc[T]) Flush(elements ...T) error {
-	return f(elements...)
+func (f FlushFunc[T]) Flush(elements []T) error {
+	return f(elements)
 }
 
 // Buffer represents an async buffer
@@ -139,7 +139,7 @@ func (b *Buffer[T]) flush(flat []T) {
 	if len(flat) == 0 {
 		return
 	}
-	if err := b.flusher.Flush(flat...); err != nil {
+	if err := b.flusher.Flush(flat); err != nil {
 		se := NewErrFlush(err, flat)
 		go func() {
 			b.errch <- se
@@ -162,7 +162,7 @@ func (b *Buffer[T]) Close() error {
 		flat = append(flat, v)
 	}
 
-	if err := b.flusher.Flush(flat...); err != nil {
+	if err := b.flusher.Flush(flat); err != nil {
 		se := NewErrFlush(err, flat)
 		fmt.Println(se)
 		return se

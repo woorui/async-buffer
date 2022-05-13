@@ -250,7 +250,7 @@ func newStringCounter(errInput string, flushCost time.Duration) *stringCounter {
 	}
 }
 
-func (c *stringCounter) Flush(str ...string) error {
+func (c *stringCounter) Flush(str []string) error {
 	time.Sleep(c.mockFlushCost)
 	c.mu.Lock()
 	defer c.mu.Unlock()
