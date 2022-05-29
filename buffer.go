@@ -56,7 +56,7 @@ type Buffer[T any] struct {
 //
 // error returned is an error channel that holds errors generated during the flush process.
 // You can subscribe to this channel if you want handle flush errors.
-// using `se := new(buffer.ErrFlush[T]); errors.As(err, &se)` to get elements that not be flushed.
+// using `se := new(buffer.ErrFlush[T]); errors.As(err, se)` to get elements that not be flushed.
 func New[T any](threshold uint32, flushInterval time.Duration, flusher Flusher[T]) (*Buffer[T], <-chan error) {
 	if threshold == 0 && flushInterval == 0 {
 		panic(fmt.Errorf("One of threshold and flushInterval must not be 0"))
@@ -182,7 +182,7 @@ func NewErrFlush[T any](err error, elements []T) error {
 	return ErrFlush[T]{underlying: err, Backup: elements}
 }
 
-func (e *ErrFlush[T]) Error() string {
+func (e ErrFlush[T]) Error() string {
 	return fmt.Sprintf("async-buffer: error while flushing error = %v, backup size = %d", e.underlying, len(e.Backup))
 }
 
