@@ -182,7 +182,7 @@ func NewErrFlush[T any](err error, elements []T) error {
 	return ErrFlush[T]{underlying: err, Backup: elements}
 }
 
-func (e ErrFlush[T]) Error() string {
+func (e *ErrFlush[T]) Error() string {
 	return fmt.Sprintf("async-buffer: error while flushing error = %v, backup size = %d", e.underlying, len(e.Backup))
 }
 
