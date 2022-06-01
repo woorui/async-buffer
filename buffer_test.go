@@ -2,209 +2,139 @@ package buffer
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
 func TestAsyncBuffer(t *testing.T) {
-	type args struct {
-		errInput       string        // counter error when errInput is not empty
-		dataGroup      [][]string    // group data be writen to async buffer
-		flushThreshold uint32        // data flush when flushThreshold be reached
-		mockFlushCost  time.Duration // time cost for flushing
-		flushInterval  time.Duration // flush interval
-		waitDuration   time.Duration // wait flushing duration
-		manual         bool          // manual flushing, only one of manual and manual is true
-		close          bool          // close flushing, only one of manual and manual is true
+	flusher := newStringCounter("", time.Microsecond)
+
+	buf, _ := New[string](flusher, Option{Threshold: 10, FlushInterval: time.Millisecond})
+
+	m := map[string]int{
+		"AA": 100,
+		"BB": 123,
+		"CC": 42,
 	}
-	tests := []struct {
-		name            string
-		args            args
-		skipCompareWant bool
-		want            map[string]int
-		wantErrBackup   []string
-	}{
-		{
-			name: "threshold be reched flushing",
-			args: args{
-				errInput:       "",
-				dataGroup:      [][]string{{"AA", "BB"}, {"AA"}, {"DD"}},
-				flushThreshold: 4,
-				mockFlushCost:  time.Microsecond,
-				flushInterval:  time.Hour,
-				waitDuration:   time.Second,
-			},
-			want: map[string]int{"AA": 2, "BB": 1, "DD": 1},
-		},
-		{
-			name: "time to flushing",
-			args: args{
-				errInput:       "",
-				dataGroup:      [][]string{{"AA", "BB"}, {"AA"}, {"DD"}, {"EEEEE"}},
-				flushThreshold: 0,
-				mockFlushCost:  time.Microsecond,
-				flushInterval:  time.Second,
-				waitDuration:   2 * time.Second,
-			},
-			want: map[string]int{"AA": 2, "BB": 1, "DD": 1, "EEEEE": 1},
-		},
-		{
-			name: "flush manually",
-			args: args{
-				errInput:       "",
-				dataGroup:      [][]string{{"EEEEE"}},
-				flushThreshold: 32,
-				mockFlushCost:  time.Microsecond,
-				flushInterval:  time.Hour,
-				waitDuration:   2 * time.Second,
-				manual:         true,
-			},
-			skipCompareWant: true,
-			want:            map[string]int{"EEEEE": 1},
-		},
-		{
-			name: "close immediately",
-			args: args{
-				errInput:       "",
-				dataGroup:      [][]string{{"AA", "BB"}, {"AA"}, {"DD"}, {"FFF"}},
-				flushThreshold: 32,
-				mockFlushCost:  time.Microsecond,
-				flushInterval:  time.Hour,
-				waitDuration:   time.Second,
-				close:          true,
-			},
-			want: map[string]int{"AA": 2, "BB": 1, "DD": 1, "FFF": 1},
-		},
-		{
-			name: "flushThreshold is zero",
-			args: args{
-				errInput:       "",
-				dataGroup:      [][]string{},
-				mockFlushCost:  time.Microsecond,
-				flushThreshold: 0,
-				flushInterval:  time.Hour,
-			},
-			want: map[string]int{},
-		},
-		{
-			name: "subscribe the error",
-			args: args{
-				errInput:       "AA",
-				dataGroup:      [][]string{{"AA"}},
-				flushThreshold: 1,
-				mockFlushCost:  time.Microsecond,
-				flushInterval:  time.Millisecond,
-				waitDuration:   time.Second,
-				manual:         true,
-				close:          true,
-			},
-			want:          map[string]int{},
-			wantErrBackup: []string{"AA"},
-		},
-		{
-			name: "closing buffer with rest data",
-			args: args{
-				errInput:       "",
-				dataGroup:      [][]string{{"BB"}, {"AA"}, {"BB", "BB", "CC"}},
-				flushThreshold: 1,
-				mockFlushCost:  time.Millisecond,
-				flushInterval:  time.Microsecond,
-				waitDuration:   time.Second,
-				manual:         false,
-				close:          true,
-			},
-			want:          map[string]int{"BB": 3, "CC": 1, "AA": 1},
-			wantErrBackup: []string{"AA"},
-		},
-		{
-			name: "closing buffer with all data error",
-			args: args{
-				errInput:       "AA",
-				dataGroup:      [][]string{{"AA"}, {"AA"}, {"AA", "AA", "AA"}},
-				flushThreshold: 1,
-				mockFlushCost:  time.Microsecond,
-				flushInterval:  time.Hour,
-				waitDuration:   time.Second,
-				manual:         false,
-				close:          true,
-			},
-			skipCompareWant: true,
-			want:            map[string]int{},
-		},
+
+	var wg sync.WaitGroup
+	for k, v := range m {
+		for i := 0; i < v; i++ {
+			wg.Add(1)
+			go func(k string) {
+				defer wg.Done()
+				_, err := buf.Write(k)
+				if err != nil {
+					fmt.Println(buf.Write(k))
+				}
+			}(k)
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			co := newStringCounter(tt.args.errInput, tt.args.mockFlushCost)
 
-			buf, errch := New[string](tt.args.flushThreshold, tt.args.flushInterval, co)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		buf.Flush()
+	}()
 
-			var wg sync.WaitGroup
-			for _, group := range tt.args.dataGroup {
-				wg.Add(1)
-				go func(group []string) {
-					defer wg.Done()
-					includes := stringInclude(group, tt.args.errInput)
+	wg.Wait()
 
-					n, err := buf.Write(group...)
-					if err != nil && !includes {
-						t.Errorf("Not expected error occurred while testing Write in multiple goroutinue, testdata = %+v", group)
-					}
-					if n != len(group) && !includes {
-						t.Errorf("Write size error in multiple goroutinue, testdata = %+v, return len = %d", group, n)
-					}
-				}(group)
-			}
-			wg.Wait()
+	buf.Close()
 
-			if tt.args.manual {
-				buf.Flush()
-			} else if tt.args.close {
-				buf.Close()
-				_, err := buf.Write("something")
-				if !errors.Is(err, ErrClosed) {
-					t.Errorf("Write after close should return ErrClosed")
-				}
-			}
+	actual := flusher.result()
 
-			if tt.args.waitDuration != 0 {
-				time.Sleep(tt.args.waitDuration)
-			}
-
-			result := co.result()
-
-			if !tt.skipCompareWant {
-				if !reflect.DeepEqual(result, tt.want) {
-					t.Errorf("Flush result error, actual: %v, want: %v", result, tt.want)
-				}
-			} else {
-				t.Logf("result: %v", result)
-			}
-
-			select {
-			case err := <-errch:
-				if se := new(ErrFlush[string]); errors.As(err, &se) {
-					if !tt.skipCompareWant && !reflect.DeepEqual(se.Backup, tt.wantErrBackup) {
-						t.Errorf("Returns err backup error, actual: %v, want: %v", se.Backup, tt.wantErrBackup)
-					}
-				}
-			default:
-			}
-
-		})
+	if !reflect.DeepEqual(m, actual) {
+		t.Errorf("TestAsyncBuffer want: %v, actual: %v", m, actual)
 	}
 }
 
-func TestPanicNew(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("The code did not panic")
-		}
-	}()
-	co := newStringCounter("", time.Microsecond)
+func TestWriteTimeout(t *testing.T) {
+	co := newStringCounter("", time.Hour)
 
-	New[string](0, 0, co)
+	threshold := uint32(1)
+
+	buf, _ := New[string](co, Option{
+		Threshold:     threshold,
+		FlushInterval: time.Hour, // block the flushing.
+		WriteTimeout:  200 * time.Millisecond,
+	})
+
+	// make buffer.datas full.
+	// buf.datas cap is 2 (Threshold*2), It will consume one immediately,
+	// then set to 3 for making block when flush the third.
+	for i := 0; i < int(threshold)*2+1; i++ {
+		buf.datas <- "KK"
+	}
+
+	n, err := buf.Write("CC")
+
+	if n != 0 || err != ErrWriteTimeout {
+		t.Errorf(
+			"TestWriteTimeout want: %d, %v, actual: %d, %v",
+			n, err,
+			0, ErrWriteTimeout,
+		)
+	}
+}
+
+func TestWriteDirectTimeout(t *testing.T) {
+	co := newStringCounter("", time.Hour)
+
+	buf, _ := New[string](co, Option{
+		Threshold:     0, // make write direct.
+		FlushInterval: 0, // make write direct.
+		WriteTimeout:  200 * time.Millisecond,
+	})
+
+	// make buffer.datas full.
+	// buf.datas cap is 2 (DefaultDataBackupSize*2) when Threshold is zero,
+	// It will consume one immediately,
+	// then set to 3 for making block when flush the third.
+	for i := 0; i < DefaultDataBackupSize+1; i++ {
+		buf.datas <- "KK"
+	}
+
+	n, err := buf.Write("CC")
+
+	if n != 0 || err != ErrWriteTimeout {
+		t.Errorf(
+			"TestWriteDirectTimeout want: %d, %v, actual: %d, %v",
+			n, err,
+			0, ErrWriteTimeout,
+		)
+	}
+}
+
+func TestWriteDirect(t *testing.T) {
+	co := newStringCounter("", 100*time.Millisecond)
+
+	buf, _ := New[string](co, Option{
+		Threshold:     0, // make write direct.
+		FlushInterval: 0, // make write direct.
+		WriteTimeout:  0,
+	})
+
+	// make buffer.datas full.
+	// buf.datas cap is 2 (DefaultDataBackupSize*2) when Threshold is zero,
+	// It will consume one immediately,
+	// then set to 3 for making block when flush the third.
+	for i := 0; i < DefaultDataBackupSize+1; i++ {
+		buf.datas <- "KK"
+	}
+
+	n, err := buf.Write("CC", "DD", "EE", "FF")
+
+	if n != 4 || err != nil {
+		t.Errorf(
+			"TestWriteDirect want: %d, %v, actual: %d, %v",
+			n, err,
+			0, ErrWriteTimeout,
+		)
+	}
 }
 
 func TestFlushFunc(t *testing.T) {
@@ -212,8 +142,7 @@ func TestFlushFunc(t *testing.T) {
 
 	flushfunc := co.Flush
 
-	buf, _ := New[string](1, 2, FlushFunc[string](flushfunc))
-
+	buf, _ := New[string](FlushFunc[string](flushfunc), Option{Threshold: 1})
 	defer buf.Close()
 
 	buf.Write("asd")
@@ -250,11 +179,14 @@ func newStringCounter(errInput string, flushCost time.Duration) *stringCounter {
 	}
 }
 
+var k = int32(0)
+
 func (c *stringCounter) Flush(str []string) error {
 	time.Sleep(c.mockFlushCost)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, v := range str {
+		atomic.AddInt32(&k, 1)
 		if v == c.errInput && c.errInput != "" {
 			return errErrInput
 		}
