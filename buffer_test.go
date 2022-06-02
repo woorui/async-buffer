@@ -52,6 +52,30 @@ func TestAsyncBuffer(t *testing.T) {
 	}
 }
 
+func TestWriteAfterClose(t *testing.T) {
+	co := newStringCounter("", 200*time.Millisecond)
+
+	threshold := uint32(1)
+
+	buf, _ := New[string](co, Option{
+		Threshold:     threshold,
+		FlushInterval: time.Hour,
+		WriteTimeout:  200 * time.Millisecond,
+	})
+
+	buf.Close()
+
+	n, err := buf.Write("CC")
+
+	if n != 0 || err != ErrClosed {
+		t.Errorf(
+			"TestWriteTimeout want: %d, %v, actual: %d, %v",
+			n, err,
+			0, ErrClosed,
+		)
+	}
+}
+
 func TestWriteTimeout(t *testing.T) {
 	co := newStringCounter("", time.Hour)
 
