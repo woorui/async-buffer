@@ -34,10 +34,17 @@ func (f FlushFunc[T]) Flush(elements []T) error {
 	return f(elements)
 }
 
+// DefaultErrHandler.
+func DefaultErrHandler[T any](err error, flat []T) {
+	fmt.Fprintf(
+		os.Stderr,
+		"async-buffer: error while flushing error = %v, backup size = %d\n", err, len(flat))
+}
+
 // Option for New the buffer.
 //
 // If both Threshold and FlushInterval are set to zero, Writing is Flushing.
-type Option struct {
+type Option[T any] struct {
 	// Threshold indicates that the buffer is large enough to trigger flushing,
 	// if Threshold is zero, do not judge threshold.
 	Threshold uint32
@@ -48,6 +55,8 @@ type Option struct {
 	// FlushInterval indicates the interval between automatic flushes, set to zero if a negative.
 	// There is automatic flushing if zero FlushInterval.
 	FlushInterval time.Duration
+	// ErrHandler handles errors, print error and elements size to stderr in default.
+	ErrHandler func(error, []T)
 }
 
 // Buffer represents an async buffer.
@@ -65,9 +74,8 @@ type Buffer[T any] struct {
 	doFlush    chan struct{}      // flush signal
 	tickerC    <-chan time.Time   // tickerC flushs datas, when tickerC is nil, Buffer do not timed flushing
 	tickerStop func()             // tickerStop stop the ticker
-	option     Option             // options
+	option     Option[T]          // options
 	flusher    Flusher[T]         // Flusher is the Flusher that flushes outputs the buffer to a permanent destination.
-	errch      chan error
 }
 
 // New returns the async buffer based on option
@@ -75,7 +83,7 @@ type Buffer[T any] struct {
 // error returned is an error channel that holds errors generated during the flush process.
 // You can subscribe to this channel if you want handle flush errors.
 // using `se := new(buffer.ErrFlush[T]); errors.As(err, &se)` to get elements that not be flushed.
-func New[T any](flusher Flusher[T], option Option) (*Buffer[T], <-chan error) {
+func New[T any](flusher Flusher[T], option Option[T]) *Buffer[T] {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	tickerC, tickerStop := wrapNewTicker(option.FlushInterval)
@@ -83,6 +91,10 @@ func New[T any](flusher Flusher[T], option Option) (*Buffer[T], <-chan error) {
 	backupSize := DefaultDataBackupSize
 	if threshold := option.Threshold; threshold != 0 {
 		backupSize = int(threshold) * 2
+	}
+
+	if option.ErrHandler == nil {
+		option.ErrHandler = DefaultErrHandler[T]
 	}
 
 	b := &Buffer[T]{
@@ -94,12 +106,11 @@ func New[T any](flusher Flusher[T], option Option) (*Buffer[T], <-chan error) {
 		tickerStop: tickerStop,
 		option:     option,
 		flusher:    flusher,
-		errch:      make(chan error),
 	}
 
 	go b.run()
 
-	return b, b.errch
+	return b
 }
 
 // Write writes elements to buffer,
@@ -158,13 +169,13 @@ func (b *Buffer[T]) writeDirect(elements []T) (int, error) {
 // run do flushing in the background and send error to error channel
 func (b *Buffer[T]) run() {
 	flat := make([]T, 0, b.option.Threshold)
-	defer b.flush(flat)
+	defer b.internalFlush(flat)
 
 	for {
 		select {
 		case <-b.ctx.Done():
 			close(b.datas)
-			b.flush(flat)
+			b.internalFlush(flat)
 			return
 		case d := <-b.datas:
 			flat = append(flat, d)
@@ -172,20 +183,20 @@ func (b *Buffer[T]) run() {
 				continue
 			}
 			if len(flat) == cap(flat) {
-				b.flush(flat)
+				b.internalFlush(flat)
 				flat = flat[:0]
 			}
 		case <-b.doFlush:
-			b.flush(flat)
+			b.internalFlush(flat)
 			flat = flat[:0]
 		case <-b.tickerC:
-			b.flush(flat)
+			b.internalFlush(flat)
 			flat = flat[:0]
 		}
 	}
 }
 
-func (b *Buffer[T]) flush(ts []T) {
+func (b *Buffer[T]) internalFlush(ts []T) {
 	if len(ts) == 0 {
 		return
 	}
@@ -196,18 +207,17 @@ func (b *Buffer[T]) flush(ts []T) {
 	done := make(chan struct{}, 1)
 	go func() {
 		if err := b.flusher.Flush(flat); err != nil {
-			se := NewErrFlush(err, flat)
-			b.errch <- se
+			b.option.ErrHandler(err, flat)
 		}
 		done <- struct{}{}
 	}()
 
-	c, stop := wrapNewTimer(b.option.WriteTimeout)
+	c, stop := wrapNewTimer(b.option.FlushTimeout)
 	defer stop()
 
 	select {
 	case <-c:
-		b.errch <- ErrFlushTimeout
+		b.option.ErrHandler(ErrFlushTimeout, flat)
 	case <-done:
 	}
 }
@@ -227,27 +237,10 @@ func (b *Buffer[T]) Close() error {
 	}
 
 	if err := b.flusher.Flush(flat); err != nil {
-		se := NewErrFlush(err, flat)
-		fmt.Fprintln(os.Stderr, se)
-		return se
+		return err
 	}
 
 	return nil
-}
-
-// ErrFlush is returned form `Write` when automatic flushing error,
-type ErrFlush[T any] struct {
-	underlying error
-	Backup     []T
-}
-
-// NewErrFlush return ErrFlush, error is flush error, elements is elements that not be handled.
-func NewErrFlush[T any](err error, elements []T) error {
-	return ErrFlush[T]{underlying: err, Backup: elements}
-}
-
-func (e ErrFlush[T]) Error() string {
-	return fmt.Sprintf("async-buffer: error while flushing error = %v, backup size = %d", e.underlying, len(e.Backup))
 }
 
 func wrapNewTicker(d time.Duration) (<-chan time.Time, func()) {

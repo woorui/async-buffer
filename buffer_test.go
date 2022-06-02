@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -13,7 +12,7 @@ import (
 func TestAsyncBuffer(t *testing.T) {
 	flusher := newStringCounter("", time.Microsecond)
 
-	buf, _ := New[string](flusher, Option{Threshold: 10, FlushInterval: time.Millisecond})
+	buf := New[string](flusher, Option[string]{Threshold: 10, FlushInterval: time.Millisecond})
 
 	m := map[string]int{
 		"AA": 100,
@@ -57,7 +56,7 @@ func TestWriteAfterClose(t *testing.T) {
 
 	threshold := uint32(1)
 
-	buf, _ := New[string](co, Option{
+	buf := New[string](co, Option[string]{
 		Threshold:     threshold,
 		FlushInterval: time.Hour,
 		WriteTimeout:  200 * time.Millisecond,
@@ -81,7 +80,7 @@ func TestWriteTimeout(t *testing.T) {
 
 	threshold := uint32(1)
 
-	buf, _ := New[string](co, Option{
+	buf := New[string](co, Option[string]{
 		Threshold:     threshold,
 		FlushInterval: time.Hour, // block the flushing.
 		WriteTimeout:  200 * time.Millisecond,
@@ -105,38 +104,10 @@ func TestWriteTimeout(t *testing.T) {
 	}
 }
 
-func TestWriteDirectTimeout(t *testing.T) {
-	co := newStringCounter("", time.Hour)
-
-	buf, _ := New[string](co, Option{
-		Threshold:     0, // make write direct.
-		FlushInterval: 0, // make write direct.
-		WriteTimeout:  200 * time.Millisecond,
-	})
-
-	// make buffer.datas full.
-	// buf.datas cap is 2 (DefaultDataBackupSize*2) when Threshold is zero,
-	// It will consume one immediately,
-	// then set to 3 for making block when flush the third.
-	for i := 0; i < DefaultDataBackupSize+1; i++ {
-		buf.datas <- "KK"
-	}
-
-	n, err := buf.Write("CC")
-
-	if n != 0 || err != ErrWriteTimeout {
-		t.Errorf(
-			"TestWriteDirectTimeout want: %d, %v, actual: %d, %v",
-			n, err,
-			0, ErrWriteTimeout,
-		)
-	}
-}
-
 func TestWriteDirect(t *testing.T) {
 	co := newStringCounter("", 100*time.Millisecond)
 
-	buf, _ := New[string](co, Option{
+	buf := New[string](co, Option[string]{
 		Threshold:     0, // make write direct.
 		FlushInterval: 0, // make write direct.
 		WriteTimeout:  0,
@@ -161,15 +132,139 @@ func TestWriteDirect(t *testing.T) {
 	}
 }
 
+func TestWriteDirectTimeout(t *testing.T) {
+	co := newStringCounter("", time.Hour)
+
+	buf := New[string](co, Option[string]{
+		Threshold:     0, // make write direct.
+		FlushInterval: 0, // make write direct.
+		WriteTimeout:  200 * time.Millisecond,
+	})
+
+	// make buffer.datas full.
+	// buf.datas cap is 2 (DefaultDataBackupSize*2) when Threshold is zero,
+	// It will consume one immediately,
+	// then set to 3 for making block when flush the third.
+	for i := 0; i < DefaultDataBackupSize+1; i++ {
+		buf.datas <- "KK"
+	}
+
+	n, err := buf.Write("CC")
+
+	if n != 0 || err != ErrWriteTimeout {
+		t.Errorf(
+			"TestWriteDirectTimeout want: %d, %v, actual: %d, %v",
+			n, err,
+			0, ErrWriteTimeout,
+		)
+	}
+}
+
+func TestWriteDirectError(t *testing.T) {
+	co := newStringCounter("ERROR", time.Millisecond)
+
+	buf := New[string](co, Option[string]{
+		Threshold:     0, // make write direct.
+		FlushInterval: 0, // make write direct.
+		WriteTimeout:  200 * time.Millisecond,
+	})
+
+	n, err := buf.Write("ERROR")
+
+	if n != 0 || err != errErrInput {
+		t.Errorf(
+			"TestWriteDirectError want: %d, %v, actual: %d, %v",
+			n, err,
+			0, errErrInput,
+		)
+	}
+}
+
+func TestCloseError(t *testing.T) {
+	co := newStringCounter("ERROR", time.Millisecond)
+
+	buf := New[string](co, Option[string]{
+		Threshold:     10,
+		FlushInterval: time.Hour,
+		WriteTimeout:  200 * time.Millisecond,
+	})
+
+	buf.Write("ERROR")
+
+	err := buf.Close()
+
+	if err != errErrInput {
+		t.Errorf(
+			"TestCloseError want: %v, actual: %v",
+			err,
+			errErrInput,
+		)
+	}
+}
+
+func TestInternalFlushFlushError(t *testing.T) {
+	co := newStringCounter("ERROR", time.Millisecond)
+
+	var ev errValidater
+
+	buf := New[string](co, Option[string]{
+		Threshold:     10,
+		FlushInterval: time.Hour,
+		WriteTimeout:  200 * time.Millisecond,
+		ErrHandler:    ev.log,
+	})
+
+	errElements := []string{"ERROR"}
+
+	buf.internalFlush(errElements)
+
+	if ev.err != errErrInput || !reflect.DeepEqual(ev.flat, errElements) {
+		t.Errorf(
+			"TestInternalFlushFlushError want: %v, %v, actual: %v, %v",
+			errErrInput, errElements,
+			ev.err, ev.flat,
+		)
+	}
+}
+
+func TestInternalFlushTimeout(t *testing.T) {
+	co := newStringCounter("", time.Hour)
+
+	var ev errValidater
+
+	buf := New[string](co, Option[string]{
+		Threshold:     10,
+		FlushInterval: time.Hour,
+		FlushTimeout:  200 * time.Millisecond,
+		ErrHandler:    ev.log,
+	})
+
+	elements := []string{"ASD"}
+
+	buf.internalFlush(elements)
+
+	if ev.err != ErrFlushTimeout || !reflect.DeepEqual(ev.flat, elements) {
+		t.Errorf(
+			"TestInternalFlushTimeout want: %v, %v, actual: %v, %v",
+			errErrInput, elements,
+			ev.err, ev.flat,
+		)
+	}
+}
+
 func TestFlushFunc(t *testing.T) {
 	co := newStringCounter("", time.Microsecond)
 
 	flushfunc := co.Flush
 
-	buf, _ := New[string](FlushFunc[string](flushfunc), Option{Threshold: 1})
+	buf := New[string](FlushFunc[string](flushfunc), Option[string]{Threshold: 1})
 	defer buf.Close()
 
 	buf.Write("asd")
+}
+
+func TestDefaultErrHandler(t *testing.T) {
+	DefaultErrHandler(errors.New("mock_error"), []string{"A", "B", "C"})
 }
 
 // stringInclude return if arr includes v
@@ -203,14 +298,11 @@ func newStringCounter(errInput string, flushCost time.Duration) *stringCounter {
 	}
 }
 
-var k = int32(0)
-
 func (c *stringCounter) Flush(str []string) error {
 	time.Sleep(c.mockFlushCost)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, v := range str {
-		atomic.AddInt32(&k, 1)
 		if v == c.errInput && c.errInput != "" {
 			return errErrInput
 		}
@@ -229,4 +321,14 @@ func (c *stringCounter) result() map[string]int {
 		result[k] = v
 	}
 	return result
+}
+
+type errValidater struct {
+	err  error
+	flat []string
+}
+
+func (ev *errValidater) log(err error, flat []string) {
+	ev.err = err
+	ev.flat = flat
 }
