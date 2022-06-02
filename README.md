@@ -37,6 +37,7 @@ The `Write`, `Flush`, `Close` api are goroutinue-safed.
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -79,13 +80,12 @@ func main() {
 	// Output
 	// print: [aaaaa bbbbb ccccc ddddd]
 
-	// 3. flush manually
-	buf.Write("eeeee", "fffff")
+	// 3. flush manually and write call `WriteWithContext`
+	buf.WriteWithContext(context.Background(), "eeeee", "fffff")
 	buf.Flush()
 	// Output
 	// print: [eeeee fffff]
 }
-
 
 ```
 
