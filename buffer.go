@@ -115,6 +115,17 @@ func New[T any](flusher Flusher[T], option Option[T]) *Buffer[T] {
 	return b
 }
 
+// WriteWithContext writes elements to buffer,
+// It returns the count the written element and a closed error if buffer was closed.
+func (b *Buffer[T]) WriteWithContext(ctx context.Context, elements ...T) (int, error) {
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	default:
+	}
+	return b.Write(elements...)
+}
+
 // Write writes elements to buffer,
 // It returns the count the written element and a closed error if buffer was closed.
 func (b *Buffer[T]) Write(elements ...T) (int, error) {

@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -166,6 +167,35 @@ func TestWriteDirect(t *testing.T) {
 			"TestWriteDirect want: %d, %v, actual: %d, %v",
 			n, err,
 			0, ErrWriteTimeout,
+		)
+	}
+}
+
+func TestWriteWithContext(t *testing.T) {
+	co := newStringCounter("", 100*time.Millisecond)
+
+	buf := New[string](co, Option[string]{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	n, err := buf.WriteWithContext(ctx, "CC", "DD", "EE", "FF")
+
+	if n != 4 || err != nil {
+		t.Errorf(
+			"TestWriteWithContext before cancel ctx want: %d, %v, actual: %d, %v",
+			0, nil,
+			n, err,
+		)
+	}
+
+	cancel()
+	n, err = buf.WriteWithContext(ctx, "CC", "DD", "EE", "FF")
+
+	if n != 0 || err != ctx.Err() {
+		t.Errorf(
+			"TestWriteWithContext after cancel ctx want: %d, %v, actual: %d, %v",
+			0, ctx.Err(),
+			n, err,
 		)
 	}
 }
