@@ -76,6 +76,7 @@ type Buffer[T any] struct {
 	tickerStop func()             // tickerStop stop the ticker
 	option     Option[T]          // options
 	flusher    Flusher[T]         // Flusher is the Flusher that flushes outputs the buffer to a permanent destination.
+	done       chan struct{}
 }
 
 // New returns the async buffer based on option
@@ -106,6 +107,7 @@ func New[T any](flusher Flusher[T], option Option[T]) *Buffer[T] {
 		tickerStop: tickerStop,
 		option:     option,
 		flusher:    flusher,
+		done:       make(chan struct{}, 1),
 	}
 
 	go b.run()
@@ -169,13 +171,13 @@ func (b *Buffer[T]) writeDirect(elements []T) (int, error) {
 // run do flushing in the background and send error to error channel
 func (b *Buffer[T]) run() {
 	flat := make([]T, 0, b.option.Threshold)
-	defer b.internalFlush(flat)
 
 	for {
 		select {
 		case <-b.ctx.Done():
 			close(b.datas)
 			b.internalFlush(flat)
+			b.done <- struct{}{}
 			return
 		case d := <-b.datas:
 			flat = append(flat, d)
@@ -227,8 +229,10 @@ func (b *Buffer[T]) Flush() { b.doFlush <- struct{}{} }
 
 // Close stop flushing and handles rest elements.
 func (b *Buffer[T]) Close() error {
-	b.tickerStop()
 	b.cancel()
+	b.tickerStop()
+
+	<-b.done
 
 	flat := make([]T, 0)
 

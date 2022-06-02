@@ -28,7 +28,7 @@ func TestAsyncBuffer(t *testing.T) {
 				defer wg.Done()
 				_, err := buf.Write(k)
 				if err != nil {
-					fmt.Println(err)
+					t.Errorf("TestAsyncBuffer unexcept error: %v\n", err)
 				}
 			}(k)
 		}
@@ -219,24 +219,29 @@ func TestWriteDirectError(t *testing.T) {
 }
 
 func TestCloseError(t *testing.T) {
-	co := newStringCounter("ERROR", time.Millisecond)
+	co := newStringCounter("ERROR", 100*time.Millisecond)
 
 	buf := New[string](co, Option[string]{
-		Threshold:     10,
+		Threshold:     100000,
 		FlushInterval: time.Hour,
 		WriteTimeout:  200 * time.Millisecond,
 	})
 
-	buf.Write("ERROR")
+	// make buf.datas is not empty when close.
+	for i := 0; i < 100; i++ {
+		buf.Write("ERROR", "ERROR", "ERROR", "ERROR")
+	}
 
 	err := buf.Close()
 
-	if err != errErrInput {
-		t.Errorf(
-			"TestCloseError want: %v, actual: %v",
-			err,
-			errErrInput,
-		)
+	if len(buf.datas) != 0 {
+		if err != errErrInput {
+			t.Errorf(
+				"TestCloseError want: %v, actual: %v",
+				errErrInput,
+				err,
+			)
+		}
 	}
 }
 
