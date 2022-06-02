@@ -25,6 +25,10 @@ So that to use async-buffer to buffer data then find a timing to batch insert th
 go get -u github.com/woorui/async-buffer
 ```
 
+## Documents
+
+Complete doc here: https://pkg.go.dev/github.com/woorui/async-buffer
+
 ## Quick start
 
 The `Write`, `Flush`, `Close` api are goroutinue-safed.
@@ -33,39 +37,39 @@ The `Write`, `Flush`, `Close` api are goroutinue-safed.
 package main
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
 	buffer "github.com/woorui/async-buffer"
 )
 
-type printer struct{}
+// pp implements Flusher interface
+type pp struct{}
 
-func (p *printer) Flush(strs ...string) error {
-	return print(strs...)
+func (p *pp) Flush(strs []string) error {
+	return print(strs)
 }
 
-func print(strs ...string) error {
-	fmt.Printf("printer flush elements: %v, flush size: %d \n", strs, len(strs))
+func print(strs []string) error {
+	fmt.Printf("print: %v \n", strs)
 	return nil
 }
 
 func main() {
-	buf, errch := buffer.New[string](6, 3*time.Second, &printer{})
-	// can also call buffer.FlushFunc to adapt the Flusher, 
-	// code as below:
-	// buf, errch := buffer.New[string](6, 3*time.Second, buffer.FlushFunc[string](print))
+	// can also call buffer.FlushFunc` to adapt a function to Flusher
+	buf := buffer.New[string](&pp{}, buffer.Option[string]{
+		Threshold:     5,
+		FlushInterval: 3 * time.Second,
+		WriteTimeout:  time.Second,
+		FlushTimeout:  time.Second,
+		ErrHandler:    func(err error, t []string) { fmt.Printf("err: %v, ele: %v", err, t) },
+	})
 	defer buf.Close()
-
-	// If you don't care about the refresh error
-	// and the refresh error elements, you can ignore them.
-	go errHandle(errch)
 
 	// 1. flush at threshold
 	buf.Write("a", "b", "c", "d", "e", "f")
 	// Output
-	// printer flush elements: [a b c d e f], flush size: 6
+	// print: [a b c d e f]
 
 	// 2. time to flush automatically
 	buf.Write("aaaaa")
@@ -73,27 +77,15 @@ func main() {
 	buf.Write("ccccc", "ddddd")
 	time.Sleep(5 * time.Second)
 	// Output
-	// printer flush elements: [aaaaa bbbbb ccccc ddddd], flush size: 4
+	// print: [aaaaa bbbbb ccccc ddddd]
 
 	// 3. flush manually
 	buf.Write("eeeee", "fffff")
 	buf.Flush()
 	// Output
-	// printer flush elements: [eeeee fffff], flush size: 2
-
-	// waiting...
-	select {}
+	// print: [eeeee fffff]
 }
 
-func errHandle(errch <-chan error) {
-	for err := range errch {
-		if se := new(buffer.ErrFlush[string]); errors.As(err, se) {
-			fmt.Printf("flush err backup %v \n", se.Backup)
-		} else {
-			fmt.Printf("flush err %v \n", err)
-		}
-	}
-}
 
 ```
 
