@@ -230,10 +230,14 @@ func (b *Buffer[T]) Close() error {
 	b.tickerStop()
 	b.cancel()
 
-	flat := make([]T, 0, len(b.datas))
+	flat := make([]T, 0)
 
 	for v := range b.datas {
 		flat = append(flat, v)
+	}
+
+	if len(flat) == 0 {
+		return nil
 	}
 
 	if err := b.flusher.Flush(flat); err != nil {
