@@ -108,8 +108,8 @@ func TestWriteAfterClose(t *testing.T) {
 	if n != 0 || err != ErrClosed {
 		t.Errorf(
 			"TestWriteTimeout want: %d, %v, actual: %d, %v",
-			n, err,
 			0, ErrClosed,
+			n, err,
 		)
 	}
 }
@@ -165,8 +165,8 @@ func TestWriteDirect(t *testing.T) {
 	if n != 4 || err != nil {
 		t.Errorf(
 			"TestWriteDirect want: %d, %v, actual: %d, %v",
-			n, err,
 			0, ErrWriteTimeout,
+			n, err,
 		)
 	}
 }
@@ -222,8 +222,8 @@ func TestWriteDirectTimeout(t *testing.T) {
 	if n != 0 || err != ErrWriteTimeout {
 		t.Errorf(
 			"TestWriteDirectTimeout want: %d, %v, actual: %d, %v",
-			n, err,
 			0, ErrWriteTimeout,
+			n, err,
 		)
 	}
 }
@@ -242,8 +242,8 @@ func TestWriteDirectError(t *testing.T) {
 	if n != 0 || err != errErrInput {
 		t.Errorf(
 			"TestWriteDirectError want: %d, %v, actual: %d, %v",
-			n, err,
 			0, errErrInput,
+			n, err,
 		)
 	}
 }
