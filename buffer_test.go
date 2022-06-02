@@ -245,6 +245,33 @@ func TestCloseError(t *testing.T) {
 	}
 }
 
+func TestClose(t *testing.T) {
+	co := newStringCounter("", 100*time.Millisecond)
+
+	buf := New[string](co, Option[string]{
+		Threshold:     100000,
+		FlushInterval: time.Hour,
+		WriteTimeout:  200 * time.Millisecond,
+	})
+
+	// make buf.datas is not empty when close.
+	for i := 0; i < 100; i++ {
+		buf.Write("AAA", "BBB", "CCC", "DDD")
+	}
+
+	err := buf.Close()
+
+	if len(buf.datas) != 0 {
+		if err != nil {
+			t.Errorf(
+				"TestClose want: %v, actual: %v",
+				nil,
+				err,
+			)
+		}
+	}
+}
+
 func TestInternalFlushFlushError(t *testing.T) {
 	co := newStringCounter("ERROR", time.Millisecond)
 
