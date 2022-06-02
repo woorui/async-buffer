@@ -28,7 +28,7 @@ func TestAsyncBuffer(t *testing.T) {
 				defer wg.Done()
 				_, err := buf.Write(k)
 				if err != nil {
-					fmt.Println(buf.Write(k))
+					fmt.Println(err)
 				}
 			}(k)
 		}
@@ -48,6 +48,44 @@ func TestAsyncBuffer(t *testing.T) {
 
 	if !reflect.DeepEqual(m, actual) {
 		t.Errorf("TestAsyncBuffer want: %v, actual: %v", m, actual)
+	}
+}
+
+func TestCallFlush(t *testing.T) {
+	flusher := newStringCounter("", time.Microsecond)
+
+	buf := New[string](flusher, Option[string]{Threshold: 1000, FlushInterval: time.Hour})
+
+	m := map[string]int{"AA": 100}
+
+	var wg sync.WaitGroup
+	for k, v := range m {
+		for i := 0; i < v; i++ {
+			wg.Add(1)
+			go func(k string) {
+				defer wg.Done()
+				_, err := buf.Write(k)
+				if err != nil {
+					fmt.Println(err)
+				}
+			}(k)
+		}
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		buf.Flush()
+	}()
+
+	wg.Wait()
+
+	buf.Close()
+
+	actual := flusher.result()
+
+	if !reflect.DeepEqual(m, actual) {
+		t.Errorf("TestCallFlush want: %v, actual: %v", m, actual)
 	}
 }
 
