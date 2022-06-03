@@ -302,6 +302,29 @@ func TestClose(t *testing.T) {
 	}
 }
 
+func TestCloseTwice(t *testing.T) {
+	co := newStringCounter("", 100*time.Millisecond)
+
+	buf := New[string](co, Option[string]{
+		Threshold:     100000,
+		FlushInterval: time.Hour,
+		WriteTimeout:  200 * time.Millisecond,
+	})
+
+	buf.Close()
+	err := buf.Close()
+
+	if len(buf.datas) != 0 {
+		if err != nil {
+			t.Errorf(
+				"TestCloseTwice want: %v, actual: %v",
+				ErrClosed,
+				err,
+			)
+		}
+	}
+}
+
 func TestInternalFlushFlushError(t *testing.T) {
 	co := newStringCounter("ERROR", time.Millisecond)
 
