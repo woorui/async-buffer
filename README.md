@@ -13,11 +13,11 @@ The async-buffer buffer data that can be flushed when reach threshold or duratio
 
 You have a message queue subscriber server.
 
-The Server receive message one by one and insert then your database,
+The Server receives messages one by one and inserts them into your database,
 
-But there is a big performance gap that between one by one insertion and batch insertion to your database.
+But there is a big performance gap between one by one insertion and batch insertion to your database.
 
-So that to use async-buffer to buffer data then find a timing to batch insert them.
+So that to use async-buffer to buffer data then find timing to batch insert them.
 
 ## Installation
 
