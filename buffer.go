@@ -20,7 +20,7 @@ var (
 	ErrFlushTimeout = errors.New("async-buffer: flush timeout")
 )
 
-// Flusher hold FlushFunc, Flusher tell Buffer how to flush data.
+// Flusher holds FlushFunc, Flusher tell Buffer how to flush data.
 type Flusher[T any] interface {
 	Flush(elements []T) error
 }
@@ -29,12 +29,12 @@ type Flusher[T any] interface {
 // as a Flusher. FlushFunc(f) is a Flusher that calls f.
 type FlushFunc[T any] func(elements []T) error
 
-// Flush calls f(ctx,m)
+// Flush calls FlushFunc itself.
 func (f FlushFunc[T]) Flush(elements []T) error {
 	return f(elements)
 }
 
-// DefaultErrHandler.
+// DefaultErrHandler prints error and the size of elements to stderr.
 func DefaultErrHandler[T any](err error, flat []T) {
 	fmt.Fprintf(
 		os.Stderr,
@@ -55,7 +55,7 @@ type Option[T any] struct {
 	// FlushInterval indicates the interval between automatic flushes, set to zero if a negative.
 	// There is automatic flushing if zero FlushInterval.
 	FlushInterval time.Duration
-	// ErrHandler handles errors, print error and elements size to stderr in default.
+	// ErrHandler handles errors, print error and the size of elements to stderr in default.
 	ErrHandler func(error, []T)
 }
 
@@ -64,9 +64,9 @@ type Option[T any] struct {
 // The Buffer automatically flush data within a cycle
 // flushing is also triggered when the data reaches the specified threshold.
 //
-// If both Threshold and FlushInterval are set to zero, Writing is Flushing.
+// If both Threshold and FlushInterval are setted to zero, Writing is Flushing.
 //
-// You can also flush data manually.
+// You can also flush data manually by calling `Flush`.
 type Buffer[T any] struct {
 	ctx        context.Context    // ctx controls the lifecycle of Buffer
 	cancel     context.CancelFunc // cancel is used to stop Buffer flushing
@@ -75,15 +75,11 @@ type Buffer[T any] struct {
 	tickerC    <-chan time.Time   // tickerC flushs datas, when tickerC is nil, Buffer do not timed flushing
 	tickerStop func()             // tickerStop stop the ticker
 	option     Option[T]          // options
-	flusher    Flusher[T]         // Flusher is the Flusher that flushes outputs the buffer to a permanent destination.
-	done       chan struct{}
+	flusher    Flusher[T]         // Flusher is the Flusher that flushes outputs the buffer to a permanent destination
+	done       chan struct{}      // done ensures internal `run` function exit
 }
 
 // New returns the async buffer based on option
-//
-// error returned is an error channel that holds errors generated during the flush process.
-// You can subscribe to this channel if you want handle flush errors.
-// using `se := new(buffer.ErrFlush[T]); errors.As(err, &se)` to get elements that not be flushed.
 func New[T any](flusher Flusher[T], option Option[T]) *Buffer[T] {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -179,7 +175,7 @@ func (b *Buffer[T]) writeDirect(elements []T) (int, error) {
 	return n, nil
 }
 
-// run do flushing in the background and send error to error channel
+// run do flushing in the background.
 func (b *Buffer[T]) run() {
 	flat := make([]T, 0, b.option.Threshold)
 
