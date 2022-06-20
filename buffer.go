@@ -35,10 +35,10 @@ func (f FlushFunc[T]) Flush(elements []T) error {
 }
 
 // DefaultErrHandler prints error and the size of elements to stderr.
-func DefaultErrHandler[T any](err error, flat []T) {
+func DefaultErrHandler[T any](err error, elements []T) {
 	fmt.Fprintf(
 		os.Stderr,
-		"async-buffer: error while flushing error = %v, backup size = %d\n", err, len(flat))
+		"async-buffer: error while flushing error = %v, backup size = %d\n", err, len(elements))
 }
 
 // Option for New the buffer.
@@ -56,7 +56,7 @@ type Option[T any] struct {
 	// There is automatic flushing if zero FlushInterval.
 	FlushInterval time.Duration
 	// ErrHandler handles errors, print error and the size of elements to stderr in default.
-	ErrHandler func(error, []T)
+	ErrHandler func(err error, elements []T)
 }
 
 // Buffer represents an async buffer.
@@ -205,13 +205,13 @@ func (b *Buffer[T]) run() {
 	}
 }
 
-func (b *Buffer[T]) internalFlush(ts []T) {
-	if len(ts) == 0 {
+func (b *Buffer[T]) internalFlush(elements []T) {
+	if len(elements) == 0 {
 		return
 	}
 
-	flat := make([]T, len(ts))
-	copy(flat, ts)
+	flat := make([]T, len(elements))
+	copy(flat, elements)
 
 	done := make(chan struct{}, 1)
 	go func() {
