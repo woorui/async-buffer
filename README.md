@@ -65,6 +65,7 @@ func main() {
 		FlushTimeout:  time.Second,
 		ErrHandler:    func(err error, t []string) { fmt.Printf("err: %v, ele: %v", err, t) },
 	})
+	// data maybe loss if Close() is not be called
 	defer buf.Close()
 
 	// 1. flush at threshold
