@@ -341,11 +341,11 @@ func TestInternalFlushFlushError(t *testing.T) {
 
 	buf.internalFlush(errElements)
 
-	if ev.err != errErrInput || !reflect.DeepEqual(ev.flat, errElements) {
+	if ev.err != errErrInput || !reflect.DeepEqual(ev.elements, errElements) {
 		t.Errorf(
 			"TestInternalFlushFlushError want: %v, %v, actual: %v, %v",
 			errErrInput, errElements,
-			ev.err, ev.flat,
+			ev.err, ev.elements,
 		)
 	}
 }
@@ -366,11 +366,11 @@ func TestInternalFlushTimeout(t *testing.T) {
 
 	buf.internalFlush(elements)
 
-	if ev.err != ErrFlushTimeout || !reflect.DeepEqual(ev.flat, elements) {
+	if ev.err != ErrFlushTimeout || !reflect.DeepEqual(ev.elements, elements) {
 		t.Errorf(
 			"TestInternalFlushTimeout want: %v, %v, actual: %v, %v",
 			errErrInput, elements,
-			ev.err, ev.flat,
+			ev.err, ev.elements,
 		)
 	}
 }
@@ -400,58 +400,4 @@ func stringInclude(arr []string, v string) bool {
 		}
 	}
 	return b
-}
-
-var errErrInput = errors.New("error input")
-
-// stringCounter counts how many times does string appear
-type stringCounter struct {
-	mu            *sync.Mutex
-	m             map[string]int
-	errInput      string
-	mockFlushCost time.Duration
-}
-
-func newStringCounter(errInput string, flushCost time.Duration) *stringCounter {
-	return &stringCounter{
-		mu:            &sync.Mutex{},
-		m:             make(map[string]int),
-		errInput:      errInput,
-		mockFlushCost: flushCost,
-	}
-}
-
-func (c *stringCounter) Flush(str []string) error {
-	time.Sleep(c.mockFlushCost)
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for _, v := range str {
-		if v == c.errInput && c.errInput != "" {
-			return errErrInput
-		}
-		vv := c.m[v]
-		vv++
-		c.m[v] = vv
-	}
-	return nil
-}
-
-func (c *stringCounter) result() map[string]int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	result := make(map[string]int, len(c.m))
-	for k, v := range c.m {
-		result[k] = v
-	}
-	return result
-}
-
-type errValidater struct {
-	err  error
-	flat []string
-}
-
-func (ev *errValidater) log(err error, flat []string) {
-	ev.err = err
-	ev.flat = flat
 }
