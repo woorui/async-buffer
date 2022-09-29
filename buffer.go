@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"time"
 )
@@ -46,7 +45,6 @@ func DefaultErrHandler[T any](err error, elements []T) {
 //
 // If both Threshold and FlushInterval are set to zero, Writing is Flushing.
 type Option[T any] struct {
-	io.WriteCloser
 	// Threshold indicates that the buffer is large enough to trigger flushing,
 	// if Threshold is zero, do not judge threshold.
 	Threshold uint32
