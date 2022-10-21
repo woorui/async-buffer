@@ -389,15 +389,3 @@ func TestFlushFunc(t *testing.T) {
 func TestDefaultErrHandler(t *testing.T) {
 	DefaultErrHandler(errors.New("mock_error"), []string{"A", "B", "C"})
 }
-
-// stringInclude return if arr includes v
-func stringInclude(arr []string, v string) bool {
-	b := false
-	for _, item := range arr {
-		if item == v {
-			b = true
-			break
-		}
-	}
-	return b
-}

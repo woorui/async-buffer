@@ -65,27 +65,22 @@ func main() {
 		FlushTimeout:  time.Second,
 		ErrHandler:    func(err error, t []string) { fmt.Printf("err: %v, ele: %v", err, t) },
 	})
+
 	// data maybe loss if Close() is not be called
 	defer buf.Close()
 
 	// 1. flush at threshold
 	buf.Write("a", "b", "c", "d", "e", "f")
-	// Output
-	// print: [a b c d e f]
 
 	// 2. time to flush automatically
 	buf.Write("aaaaa")
 	buf.Write("bbbbb")
 	buf.Write("ccccc", "ddddd")
 	time.Sleep(5 * time.Second)
-	// Output
-	// print: [aaaaa bbbbb ccccc ddddd]
 
 	// 3. flush manually and write call `WriteWithContext`
 	buf.WriteWithContext(context.Background(), "eeeee", "fffff")
 	buf.Flush()
-	// Output
-	// print: [eeeee fffff]
 }
 
 ```
