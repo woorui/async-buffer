@@ -35,8 +35,6 @@ func Example() {
 
 	buf.Write("a", "b", "c", "d", "e", "f")
 
-	time.Sleep(time.Second)
-
 	// Output:
 	// a b c d e f
 }
