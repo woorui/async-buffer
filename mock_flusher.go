@@ -51,13 +51,13 @@ func (c *stringCounter) result() map[string]int {
 	return result
 }
 
-// errValidater records err and err elements
-type errValidater struct {
+// errRecoder records err and err elements
+type errRecoder struct {
 	err      error
 	elements []string
 }
 
-func (ev *errValidater) log(err error, elements []string) {
-	ev.err = err
-	ev.elements = elements
+func (e *errRecoder) log(err error, elements []string) {
+	e.err = err
+	e.elements = elements
 }

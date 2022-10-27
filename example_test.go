@@ -15,14 +15,16 @@ func (p *pp) Flush(strs []string) error {
 }
 
 func print(strs []string) error {
-	fmt.Printf("print: %v \n", strs)
+	for _, s := range strs {
+		fmt.Printf("%s ", s)
+	}
 	return nil
 }
 
 func Example() {
 	// can also call buffer.FlushFunc` to adapt a function to Flusher
 	buf := buffer.New[string](&pp{}, buffer.Option[string]{
-		Threshold:     5,
+		Threshold:     1,
 		FlushInterval: 3 * time.Second,
 		WriteTimeout:  time.Second,
 		FlushTimeout:  time.Second,
@@ -33,6 +35,8 @@ func Example() {
 
 	buf.Write("a", "b", "c", "d", "e", "f")
 
+	time.Sleep(time.Second)
+
 	// Output:
-	// 	print: [a b c d e f]
+	// a b c d e f
 }

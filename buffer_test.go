@@ -328,7 +328,7 @@ func TestCloseTwice(t *testing.T) {
 func TestInternalFlushFlushError(t *testing.T) {
 	co := newStringCounter("ERROR", time.Millisecond)
 
-	var ev errValidater
+	var ev errRecoder
 
 	buf := New[string](co, Option[string]{
 		Threshold:     10,
@@ -353,7 +353,7 @@ func TestInternalFlushFlushError(t *testing.T) {
 func TestInternalFlushTimeout(t *testing.T) {
 	co := newStringCounter("", time.Hour)
 
-	var ev errValidater
+	var ev errRecoder
 
 	buf := New[string](co, Option[string]{
 		Threshold:     10,
