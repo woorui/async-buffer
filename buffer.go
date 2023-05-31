@@ -236,8 +236,10 @@ func (b *Buffer[T]) Flush() { b.doFlush <- struct{}{} }
 
 // Close stop flushing and handles rest elements.
 func (b *Buffer[T]) Close() error {
-	if b.ctx.Err() != nil {
+	select {
+	case <-b.ctx.Done():
 		return ErrClosed
+	default:
 	}
 	b.cancel()
 	b.tickerStop()
