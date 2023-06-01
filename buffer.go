@@ -210,8 +210,7 @@ func (b *Buffer[T]) internalFlush(elements []T) {
 		return
 	}
 
-	flat := make([]T, len(elements))
-	copy(flat, elements)
+	flat := elements[:len(elements):len(elements)]
 
 	done := make(chan struct{}, 1)
 	go func() {
