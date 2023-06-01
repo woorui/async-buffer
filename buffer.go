@@ -184,7 +184,7 @@ func (b *Buffer[T]) run() {
 		case <-b.ctx.Done():
 			close(b.datas)
 			b.internalFlush(flat)
-			b.done <- struct{}{}
+			close(b.done)
 			return
 		case d := <-b.datas:
 			flat = append(flat, d)
