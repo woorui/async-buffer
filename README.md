@@ -2,6 +2,7 @@
 
 [![Go](https://github.com/woorui/async-buffer/actions/workflows/go.yml/badge.svg)](https://github.com/woorui/async-buffer/actions/workflows/go.yml)
 [![codecov](https://codecov.io/gh/woorui/async-buffer/branch/main/graph/badge.svg?token=G7OK0KG9YT)](https://codecov.io/gh/woorui/async-buffer)
+[![Go Reference](https://pkg.go.dev/badge/github.com/woorui/async-buffer.svg)](https://pkg.go.dev/github.com/woorui/async-buffer)
 
 The async-buffer buffer data that can be flushed when reach threshold or duration limit. It is multi-goroutinue safe.
 
@@ -24,10 +25,6 @@ So that to use async-buffer to buffer data then find timing to batch insert them
 ```
 go get -u github.com/woorui/async-buffer
 ```
-
-## Documents
-
-Complete doc here: https://pkg.go.dev/github.com/woorui/async-buffer
 
 ## Quick start
 
